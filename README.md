@@ -2,6 +2,8 @@
 
 An analysis of Singapore HDB resale transactions (Jan 2017 – Sep 2026) that looks at why record prices keep being set while the overall market softens.
 
+**In short:** both headlines are true. Like-for-like prices dipped about 1% in 2026, while most million-dollar sales come from the whole market rising past a fixed S$1M line. Since mid-2025 the market has started to split by **lease and flat size, not location**. See [Findings](#5-analysis--findings) and [Recommendations](#6-recommendations).
+
 ---
 
 ## 1. Context
@@ -95,13 +97,80 @@ Overall the data is in good shape: there are no missing values, no gaps in month
 | Resale data sorted by month | The raw file goes out of date order from 2021 onwards |
 | Property Y/N columns → True/False | So they can be counted and filtered directly |
 
-### Kept as-is (keep in mind during analysis)
+---
 
-- **318 exact duplicate rows** (mostly 2017): they may be real sales of identical neighbouring flats, so they weren't removed.
-- **67 prices include cents**, mostly "lucky" `.88` endings (e.g. S$1,388,888.88). These are real, so prices are kept as decimals.
-- **3 sales at Block 82 Macpherson Lane** have no matching block, so use a left join to keep them.
-- **2026 is a partial year (Jan–Sep)**, and **Apr–May 2020** volumes are very low (COVID-19 circuit breaker). Compare quarters or matching periods.
-- **Small groups**, such as 1 ROOM (88 sales), MULTI-GENERATION (90) and Bukit Timah (588), give unreliable medians.
+## 5. Analysis & Findings
+
+The full analysis is in [`code/analysis.ipynb`](code/analysis.ipynb). Each question is answered with a simple grouped comparison, then checked with a regression.
+
+### How it was done
+
+- **Mix-adjusted price index:** the raw median moves whenever a different mix of flats is sold (e.g. more large flats). To compare like with like, sales are grouped by **town × flat type × lease band**, each group's price per sqm is compared with its own 2017–2019 level, and the groups are combined using fixed 2017–2019 weights. This works like HDB's Resale Price Index, in a simplified form.
+- **Prime towns, defined from the data:** the towns above the largest price gap in the 2017–2019 ranking. These are Central Area, Queenstown, Bukit Timah, Bukit Merah, Marine Parade and Bishan.
+- **Regression by period:** price per sqm is modelled on town, flat type, lease, storey and block features for **2019** (before the surge), **2021** (start of the surge) and **2025–26** (now), to see how each factor's importance changed.
+
+### Findings
+
+**1. The headline dip is real, but small.** Like-for-like prices peaked in 2025 Q4 and fell in each quarter of 2026, about 1% in total. The raw median didn't show this: it held at about S$630K because more large flats were being sold.
+
+**2. Most of the million-dollar surge is the whole market crossing a fixed line.** Prices are about 55% higher than in 2017–2019, which pushes many ordinary 5 ROOM and EXECUTIVE flats past S$1M. Measured against a line that rises with the market, the share of top-end sales is about 7% today, *lower* than the 10–12% of 2017–2021.
+
+| | 2019 | 2026 (Jan–Sep) |
+|---|---|---|
+| Sales at S$1M or more | 0.3% | 7.5% |
+| Sales above a market-adjusted line | 10.8% | 7.2% |
+
+**3. Since mid-2025 the market has split by lease and size, not location.** From 2025 Q2 to 2026 Q3, like-for-like:
+
+| Rising | Falling |
+|---|---|
+| Flats with 90+ years left: **+2.0%** | Flats with under 60 years left: **−3.5%** |
+| 5 ROOM flats: **+1.3%** | 3 ROOM flats: **−1.9%** |
+
+The lease split holds in both prime and other towns. The record sales all come from the rising segment.
+
+**4. Location matters less; lease matters more.** For the same flat type and lease, prime towns' premium fell from about **50% (2019) to 32–37% (2024–26)**, and outer towns' discounts narrowed. In the regression, town now explains 21 points of price variation (down from 35 in 2019), while lease left explains 18 (up from 12).
+
+**5. Floor height adds less than people think.** Within the same block, floors 25+ sell for only about **5% more** per sqm than floors 4–9, and that hasn't changed since 2019. The Pinnacle@Duxton records were set by successively *lower* floors (49–51 → 43–45 → 28–30 → 19–21), which points to differences between individual units (renovation, facing, view) outweighing height.
+
+> This corrects part of the original problem statement: the premium segment is defined by **young lease and larger flats**, not by prime estates.
+
+---
+
+## 6. Recommendations
+
+| For | Recommendation | Confidence |
+|---|---|---|
+| **Homebuyers** | **Judge a flat by its lease, not just its town.** A young-lease flat in a non-prime town can hold value better than an old flat in a prime town. | High |
+| **Homebuyers** | **Treat a cheap short-lease flat as a risk, not a bargain.** Flats with 60–70 years left are about 20–25% cheaper per sqm than young flats in the same town, and they are a falling segment. | High for the gap; medium for the trend |
+| **Homebuyers** | **Don't overpay for height.** Within the same block, high floors are worth only about 5% more than mid-low floors. | High |
+| **Sellers of older or smaller flats** | **Don't benchmark against record headlines.** Records come from young-lease 5 ROOM flats. Use recent sales of similar flats in the same town and lease band. | High |
+| **Policymakers** | **Focus on lease decay rather than prime locations.** The location premium is shrinking; the gap between young and old leases is where values are diverging. | Medium: the split is recent |
+| **Policymakers** | **Read S$1M counts carefully.** Most of the rise is general price growth past a fixed nominal line. Track a market-adjusted measure alongside it. | High |
+
+### Limitations
+
+- **No buyer data** (income, age, household type), so the analysis can't show who is priced out or test the K-shaped economy idea.
+- **No location detail** below block, such as distance to MRT stations or schools.
+- **The split is recent** (5 quarters) and could reverse, so it should be re-checked as new data comes in.
+- **Recent sales are still being registered:** the S$1.72M Pinnacle@Duxton record (Sep 2026) isn't in the data yet.
+- **The mix-adjusted index approximates** HDB's Resale Price Index. It matches the direction of the published figures, not the exact values.
+
+---
+
+## Repository Structure
+
+```
+├── README.md
+├── code/
+│   ├── data-cleaning.ipynb   # profile the raw data, apply fixes, save the cleaned files
+│   └── analysis.ipynb        # answer the problem statement and make recommendations
+└── data/
+    ├── ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv          # raw
+    ├── ResaleflatpricesbasedonregistrationdatefromJan2017onwards_clean.csv    # cleaned
+    ├── HDBPropertyInformation.csv                                             # raw
+    └── HDBPropertyInformation_clean.csv                                       # cleaned
+```
 
 ---
 
